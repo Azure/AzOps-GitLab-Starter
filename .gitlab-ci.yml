@@ -1,0 +1,51 @@
+#Attach powershell image which is a requirement
+image: "mcr.microsoft.com/powershell"
+
+#Install dependencies
+before_script:
+  - apt-get -qq update > /dev/null
+  - apt-get -qq install -y jq > /dev/null
+  - apt-get -qq install -y git > /dev/null
+  - echo -e "\e[1;33m\e[0Ksection_start:`date +%s`:install_PS\r\e[0KInstall PowerShell and connect\e[0m"
+  - pwsh -c "Install-Module -Name "AzOps" -Force"
+  - pwsh -f ./.scripts/Connect-Azure.ps1
+  - echo -e "\e[0Ksection_end:`date +%s`:install_PS\r\e[0K"
+
+#Variables
+variables:
+  branch: "automated"
+  folder: "root"
+  commit_message: "Pull from Azure to 'Automated' branch"
+  pull_request: "Automated pull request - auto approved"
+  continue: "yes"
+
+#links to the individual jobs
+include:
+  - ".pipelines/pull.yml"
+  - ".pipelines/deploy.yml"
+  - ".pipelines/validate.yml"
+
+#Jobs
+
+#Connects to Azure on a schedule looks for changes, if there are any it pull them down and syncs them
+#into the repo.
+Pull:
+  rules:
+    - !reference [.Pull, rules]
+  script:
+    - !reference [.Pull, script]
+
+#Deploy to Azure when the repo is updated via a git-push AND IF the updated files are in the 'root' folder only.
+#After the deploy job run the sync job
+Deploy and pull:
+  rules:
+    - !reference [.Deploy, rules]
+  script:
+    - !reference [.Deploy, script]
+    - !reference [.Pull, script]
+
+Validate:
+  rules:
+    - !reference [.Validate, rules]
+  script:
+    - !reference [.Validate, script]

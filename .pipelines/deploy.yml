@@ -1,0 +1,28 @@
+#Deploy to Azure when the repo is updated via a git-push AND the updated files are in the 'root' foler only.
+.Deploy:
+  rules:
+    #When the "Pull" job triggers above, it saves files to the repo, therefore the pull job will trigger this push job also; this is undesirable.
+    #The pull job executes as a bot as the user specified below. The If statement prevents this push job from executing
+    # if the file changes to the repo where by the bot, therefore this job won't trigger when a pull job executes.
+    - if: $CI_COMMIT_AUTHOR != "project <project25707_bot@example.com>"  && $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - "root/**/*"
+  script: |
+    echo -e "\e[1;33m\e[0Ksection_start:`date +%s`:diff\r\e[0KDiff - Check for changes\e[0m"
+    if [ ! -z "$(git diff --name-status HEAD^ HEAD)" ]; then
+    echo $(git diff --name-status HEAD^ HEAD)
+    git diff --name-status HEAD^ HEAD > /tmp/diff.txt
+    if [ ! -z "$(git diff --diff-filter=D HEAD^ HEAD)" ]; then
+    echo $(git diff --diff-filter=D HEAD^ HEAD  --no-prefix | grep ^- | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | less -r)
+    git diff --diff-filter=D HEAD^ HEAD --no-prefix | grep ^- | sed -r "s/^([^-+ ]*)[-+ ]/\\1/" | less -r > /tmp/diffdeletedfiles.txt
+    fi
+    else
+    echo "The validation pipeline failed because there is currently no change to be processed"
+    exit 1
+    fi
+    echo -e "\e[0Ksection_end:`date +%s`:diff\r\e[0K"
+
+    #Push latest repo changes to Azure.
+    echo -e "\e[1;33m\e[0Ksection_start:`date +%s`:deploy\r\e[0KDeploy to Azure\e[0m"
+    pwsh -f ./.scripts/Invoke-GitLabAzOpsAction.ps1 -Action Push
+    echo -e "\e[0Ksection_end:`date +%s`:deploy\r\e[0K"
